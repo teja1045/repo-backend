@@ -116,8 +116,4 @@ function calculateTeklaQuote(rawInput) {
   };
 }
 
-module.exports = {
-  calculateTeklaQuote,
-  normalizeInput,
-  DEFAULT_INPUT
-};
+export { calculateTeklaQuote, normalizeInput, DEFAULT_INPUT };

@@ -1,9 +1,11 @@
 # Project Quote Backend (AI Tekla Quote)
 
-Clean Node.js backend for the **project-Quote** front end. It provides quote defaults and an AI-assisted Tekla estimate API.
+Clean Node.js + Express backend for the **project-Quote** front end. It provides quote defaults and an AI-assisted Tekla estimate API.
 
 ## Stack
-- Node.js HTTP server (no external runtime dependencies)
+- Node.js
+- Express
+- CORS middleware
 - Centralized pricing engine in `pricing.js`
 
 ## Project structure
@@ -26,14 +28,12 @@ npm install
 npm run start
 ```
 
-`npm install` succeeds without npm registry package downloads because this backend uses only Node.js built-ins.
-
 ## Environment variables
 
 | Name | Required | Description |
 |---|---|---|
 | `PORT` | Yes | API server port (Render provides this automatically) |
-| `CORS_ORIGIN` | No | Allowed front-end origin (defaults to `*`) |
+| `CORS_ORIGIN` | No | Allowed front-end origin |
 
 > `PORT` is mandatory. The server exits on startup if `PORT` is missing or invalid.
 

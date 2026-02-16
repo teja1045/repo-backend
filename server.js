@@ -1,29 +1,6 @@
-const { createServer } = require("http");
-const { parse: parseUrl } = require("url");
-const { readFileSync, existsSync } = require("fs");
-const { calculateTeklaQuote, DEFAULT_INPUT } = require("./pricing");
-
-function loadEnvFile() {
-  if (!existsSync(".env")) return;
-
-  const lines = readFileSync(".env", "utf8").split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const separator = trimmed.indexOf("=");
-    if (separator <= 0) continue;
-
-    const key = trimmed.slice(0, separator).trim();
-    const value = trimmed.slice(separator + 1).trim();
-
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
-  }
-}
-
-loadEnvFile();
+import express from "express";
+import cors from "cors";
+import { calculateTeklaQuote, DEFAULT_INPUT } from "./pricing.js";
 
 if (!process.env.PORT) {
   throw new Error("Missing required environment variable: PORT");
@@ -34,87 +11,43 @@ if (!Number.isInteger(port) || port <= 0) {
   throw new Error("Environment variable PORT must be a valid positive integer");
 }
 
-const corsOrigin = process.env.CORS_ORIGIN || "*";
+const app = express();
 
-function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": corsOrigin,
-    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
-  });
-  res.end(JSON.stringify(payload));
-}
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
 
-function parseJsonBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    req.on("data", (chunk) => chunks.push(chunk));
-    req.on("end", () => {
-      if (chunks.length === 0) {
-        resolve({});
-        return;
-      }
-
-      try {
-        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
-      } catch (error) {
-        reject(new Error("Request body must be valid JSON"));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-const server = createServer(async (req, res) => {
-  const { pathname } = parseUrl(req.url || "", true);
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": corsOrigin,
-      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type"
-    });
-    res.end();
-    return;
-  }
-
-  if (req.method === "GET" && pathname === "/health") {
-    sendJson(res, 200, {
-      status: "ok",
-      service: "project-quote-backend",
-      timestamp: new Date().toISOString()
-    });
-    return;
-  }
-
-  if (req.method === "GET" && pathname === "/api/defaults") {
-    sendJson(res, 200, { defaults: DEFAULT_INPUT });
-    return;
-  }
-
-  if (req.method === "POST" && pathname === "/api/quote") {
-    try {
-      const body = await parseJsonBody(req);
-      const quote = calculateTeklaQuote(body);
-      sendJson(res, 200, { success: true, quote });
-    } catch (error) {
-      sendJson(res, 400, {
-        success: false,
-        message: "Unable to generate quote from provided input.",
-        error: error.message
-      });
-    }
-    return;
-  }
-
-  sendJson(res, 404, {
-    success: false,
-    message: `Route ${req.method} ${pathname} not found.`
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "project-quote-backend",
+    timestamp: new Date().toISOString()
   });
 });
 
-server.listen(port, () => {
-  // eslint-disable-next-line no-console
+app.get("/api/defaults", (_req, res) => {
+  res.status(200).json({ defaults: DEFAULT_INPUT });
+});
+
+app.post("/api/quote", (req, res) => {
+  try {
+    const quote = calculateTeklaQuote(req.body || {});
+    res.status(200).json({ success: true, quote });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Unable to generate quote from provided input.",
+      error: error.message
+    });
+  }
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.originalUrl} not found.`
+  });
+});
+
+app.listen(port, () => {
   console.log(`✅ Tekla quote backend running on http://localhost:${port}`);
 });
